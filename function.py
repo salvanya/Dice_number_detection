@@ -15,9 +15,9 @@ def dice_number_detector(video_path, output_path):
     # Configuración para detección de dados quietos --------------------------------
 
     # Umbral para considerar quietos a los centroides
-    umbral_distancia_centroides = 9
+    umbral_distancia_centroides = 10
     # Número de frames estables para considerar que los dados están quietos
-    num_frames_estables = 30  
+    num_frames_estables = 5
 
     # Configuración para detección dedados y números --------------------------------
 
@@ -30,25 +30,24 @@ def dice_number_detector(video_path, output_path):
     umbral_binario_dados = 75
 
     # Umbral para la binarización para detectar los puntos de las caras
-    umbral_binario_numeros = 195
+    umbral_binario_numeros = 197
 
     # Área mínima para considerar una componente conexa un punto de la cara
     min_area_punto = 10
 
     # Número de frames consecutivos para considerar estable el número de un dado
-    num_frames_estable_numero = 10  
+    num_frames_estable_numero = 7
 
     # Variables para seguimiento de centroides y números ---------------------------------------------------------------------------
     centroids_anteriores = None
     contador_frames_estables = 0
     # Crear diccionarios para determinar números estables 
-    numeros_estables = {i: {'numero': 0, 'contador_frames': 0, 'mostrar': False, 'condicion_activada': False} for i in range(5)}
+    numeros_estables = {i: {'numero': 0, 'contador_frames': 0} for i in range(5)}
 
     # Configuración para el video de salida ----------------------------------------------------------------------------------------
     output_size = (int(cap.get(3)*0.5), int(cap.get(4)*0.5))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, 30.0, output_size)
-
 
     # Bucle para procesar cada frame -----------------------------------------------------------------------------------------------
     while True:
@@ -68,14 +67,13 @@ def dice_number_detector(video_path, output_path):
         # Binarizar la imagen usando un umbral
         _, binary_frame_dados = cv2.threshold(red_channel, umbral_binario_dados, 255, cv2.THRESH_BINARY)
 
-        # Encontrar los componentes conectados de los dados
+        # Encontrar los componentes conectadas de los dados
         num_labels_dados, labels_dados, stats_dados, centroids_dados = cv2.connectedComponentsWithStats(binary_frame_dados, connectivity=8)
 
         # Filtrar las componentes de dados por área y relación de aspecto
         dados_filtrados = []
-        
+
         for label in range(1, num_labels_dados):
-            
             area_dados = stats_dados[label, cv2.CC_STAT_AREA]
 
             if min_area_dados <= area_dados <= max_area_dados:
@@ -84,23 +82,21 @@ def dice_number_detector(video_path, output_path):
 
                 if 1 / aspect_ratio_threshold_dados <= aspect_ratio_dados <= aspect_ratio_threshold_dados:
                     # Almacenar las coordenadas de las bounding boxes
-                    dados_filtrados.append((x_dados, y_dados, x_dados + w_dados, y_dados + h_dados))  
+                    dados_filtrados.append((x_dados, y_dados, x_dados + w_dados, y_dados + h_dados))
 
-        # Medir la distancia entre centroides de frames consecutivos para todos los centroides
+        # Obtener los centroides de los dados filtrados
+        centroids_dados_filtrados = [((x + x_max) // 2, (y + y_max) // 2) for x, y, x_max, y_max in dados_filtrados]
+
+        # Medir la distancia entre centroides de frames consecutivos para los centroides filtrados
         if centroids_anteriores is not None:
-            # Coomprobar si los dados están "quietos"
-            if np.linalg.norm(centroids_anteriores[0] - centroids_dados[0]) < umbral_distancia_centroides:
+            # Comprobar si los dados están "quietos"
+            if all(np.linalg.norm(np.array(anterior) - np.array(actual)) < umbral_distancia_centroides for anterior, actual in zip(centroids_anteriores, centroids_dados_filtrados)):
                 contador_frames_estables += 1
             else:
                 contador_frames_estables = 0
 
             # Si se han mantenido "quietos" durante un número suficiente de frames y hay 5 dados detectados, se procede:
             if contador_frames_estables >= num_frames_estables and len(dados_filtrados) == 5:
-
-                # Flag para la activación inicial
-                if not any(numero_estable['condicion_activada'] for numero_estable in numeros_estables.values()):
-                    for numero_estable in numeros_estables.values():
-                        numero_estable['condicion_activada'] = True
 
                 for bbox_dados in dados_filtrados:
                     x_dados, y_dados, x_max_dados, y_max_dados = bbox_dados
@@ -123,7 +119,7 @@ def dice_number_detector(video_path, output_path):
                     # Actualizar el número estable detectado para el dado actual
                     numeros_estables[dados_filtrados.index(bbox_dados)]['numero'] = cantidad_numeros
                     numeros_estables[dados_filtrados.index(bbox_dados)]['contador_frames'] += 1
-                    numeros_estables[dados_filtrados.index(bbox_dados)]['mostrar'] = True
+
 
                     # Verificar si el número ha sido estable durante el número requerido de frames consecutivos
                     if numeros_estables[dados_filtrados.index(bbox_dados)]['contador_frames'] >= num_frames_estable_numero:
@@ -134,17 +130,10 @@ def dice_number_detector(video_path, output_path):
                         # Dibujar el número sobre el frame original
                         cv2.putText(resized_frame, str(cantidad_numeros), (x_dados, y_dados - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2,
                                     cv2.LINE_AA)
-            else:
-                # Si no se cumplen las condiciones, oculta los números de los dados
-                for numero_estable in numeros_estables.values():
-                    numero_estable['mostrar'] = False
-                    # Restablecer la segunda flag si se rompe la condición
-                    if numero_estable['condicion_activada']:
-                        numero_estable['contador_frames'] = 0
-                        numero_estable['condicion_activada'] = False
+
 
         # Guardar los centroides para la próxima iteración
-        centroids_anteriores = centroids_dados.copy()
+        centroids_anteriores = centroids_dados_filtrados.copy()
 
         # Mostrar el frame original con rectángulos dibujados
         cv2.imshow('Original Frame', resized_frame)
@@ -160,4 +149,3 @@ def dice_number_detector(video_path, output_path):
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-
