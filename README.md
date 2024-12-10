@@ -1,4 +1,4 @@
-# Dice Detection Using Classic Image Processing Techniques
+# Dice detection using classic image processing techniques
 
 This repository demonstrates the use of traditional image processing methods to detect dice in video frames and identify the number displayed on each die. The project was developed for academic purposes, focusing on the practical application of classical techniques.
 
@@ -13,12 +13,30 @@ This repository demonstrates the use of traditional image processing methods to 
 7. [License](#license)
 
 ## Overview
+This project implements **classical image processing techniques** for dice detection and number recognition. The workflow involves the following steps:
 
-This project uses predefined assumptions to detect dice:
+1. **Frame Preprocessing**:
+   - Frames are resized to reduce computational load.
+   - The red color channel is extracted to leverage the dice's color properties.
+
+2. **Dice Detection**:
+   - Thresholding is applied to binarize the red channel, isolating potential dice regions.
+   - Connected components analysis is used to detect regions of interest (ROI) based on their size and aspect ratio.
+   - Dice positions are filtered and tracked over consecutive frames to ensure stability.
+
+3. **Number Recognition**:
+   - Regions corresponding to dice are further processed to detect dots:
+     - A higher threshold is applied to isolate white dots.
+     - Connected components analysis identifies individual dots based on size constraints.
+   - The total number of dots for each die is calculated and tracked across frames to ensure stability.
+
+4. **Visualization and Output**:
+   - Detected dice are highlighted with bounding boxes, and the recognized numbers are overlaid on the original video.
+   - The processed frames are saved as an output video.
+
+This method relies on predefined assumptions to detect dice:
 - **Dice Color**: Transparent red dice with white dots
 - **Background Color**: Green
-
-A video is processed to identify dice, detect their positions, and calculate the number of white dots visible on their surfaces. The results are overlaid on the original video and saved as a new output file.
 
 ## Requirements
 
